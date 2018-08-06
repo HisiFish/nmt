@@ -561,34 +561,7 @@ def run_main(flags, default_hparams, train_fn, inference_fn, target_session=""):
   hparams = create_or_load_hparams(
       out_dir, default_hparams, flags.hparams_path, save_hparams=(jobid == 0))
 
-  if flags.inference_input_file:
-    # Inference indices
-    hparams.inference_indices = None
-    if flags.inference_list:
-      (hparams.inference_indices) = (
-          [int(token)  for token in flags.inference_list.split(",")])
-
-    # Inference
-    trans_file = flags.inference_output_file
-    ckpt = flags.ckpt
-    if not ckpt:
-      ckpt = tf.train.latest_checkpoint(out_dir)
-    inference_fn(ckpt, flags.inference_input_file,
-                 trans_file, hparams, num_workers, jobid)
-
-    # Evaluation
-    ref_file = flags.inference_ref_file
-    if ref_file and tf.gfile.Exists(trans_file):
-      for metric in hparams.metrics:
-        score = evaluation_utils.evaluate(
-            ref_file,
-            trans_file,
-            metric,
-            hparams.subword_option)
-        utils.print_out("  %s: %.1f" % (metric, score))
-  else:
-    # Train
-    train_fn(hparams, target_session=target_session)
+  train_fn(hparams, target_session=target_session)
 
 
 def main(unused_argv):
