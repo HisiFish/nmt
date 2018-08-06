@@ -285,8 +285,35 @@ def add_arguments(parser):
                       help="number of inter_op_parallelism_threads")
   parser.add_argument("--num_intra_threads", type=int, default=0,
                       help="number of intra_op_parallelism_threads")
+  
+  # TPU
+  parser.add_argument(
+      "--tpu", default=None,
+      help="The Cloud TPU to use for training. This should be either the name "
+      "used when creating the Cloud TPU, or a grpc://ip.address.of.tpu:8470 "
+      "url.")
+  parser.add_argument(
+      "--tpu_zone", default=None,
+      help="[Optional] GCE zone where the Cloud TPU is located in. If not "
+      "specified, we will attempt to automatically detect the GCE project from "
+      "metadata.")
+  parser.add_argument(
+      "--gcp_project", default=None,
+      help="[Optional] Project name for the Cloud TPU-enabled project. If not "
+      "specified, we will attempt to automatically detect the GCE project from "
+      "metadata.")
 
-
+  # Model specific parameters
+  parser.add_argument("--data_dir", default=None,
+                         "Path to directory containing the MNIST dataset")
+  parser.add_argument("--model_dir", default=None, "Estimator model_dir")
+  parser.add_argument("--train_steps", default=1000, "Total number of training steps.")
+  parser.add_argument("--use_tpu", default=True, "Use TPUs rather than plain CPUs")
+  parser.add_argument("--iterations", default=50,
+                          "Number of iterations per TPU training loop.")
+  tf.flags.DEFINE_integer("--num_shards", default=8, "Number of shards (TPU chips).")
+  
+  
 def create_hparams(flags):
   """Create training hparams."""
   return tf.contrib.training.HParams(
@@ -561,7 +588,7 @@ def run_main(flags, default_hparams, train_fn, inference_fn, target_session=""):
   hparams = create_or_load_hparams(
       out_dir, default_hparams, flags.hparams_path, save_hparams=(jobid == 0))
 
-  train_fn(hparams, target_session=target_session)
+  train_fn(flags, hparams, target_session=target_session)
 
 
 def main(unused_argv):
