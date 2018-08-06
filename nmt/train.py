@@ -268,7 +268,7 @@ def before_train(loaded_train_model, train_model, train_sess, global_step,
   return stats, info, start_train_time
 
 
-def train(hparams, scope=None, target_session=""):
+def train(FLAGS, hparams, scope=None, target_session=""):
   """Train a translation model."""
   log_device_placement = hparams.log_device_placement
   out_dir = hparams.out_dir
@@ -328,15 +328,15 @@ def train(hparams, scope=None, target_session=""):
         train_model.model, model_dir, train_sess, "train")
 
   # Summary writer
-  summary_writer = tf.summary.FileWriter(
-      os.path.join(out_dir, summary_name), train_model.graph)
+  #summary_writer = tf.summary.FileWriter(
+  #    os.path.join(out_dir, summary_name), train_model.graph)
 
   # First evaluation
-  run_full_eval(
-      model_dir, infer_model, infer_sess,
-      eval_model, eval_sess, hparams,
-      summary_writer, sample_src_data,
-      sample_tgt_data, avg_ckpts)
+  #run_full_eval(
+  #    model_dir, infer_model, infer_sess,
+  #    eval_model, eval_sess, hparams,
+  #    summary_writer, sample_src_data,
+  #    sample_tgt_data, avg_ckpts)
 
   last_stats_step = global_step
   last_eval_step = global_step
@@ -345,6 +345,34 @@ def train(hparams, scope=None, target_session=""):
   # This is the training loop.
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
+    
+  tpu_cluster_resolver = tf.contrib.cluster_resolver.TPUClusterResolver(
+      FLAGS.tpu,
+      zone=FLAGS.tpu_zone,
+      project=FLAGS.gcp_project
+  )
+
+  run_config = tf.contrib.tpu.RunConfig(
+      cluster=tpu_cluster_resolver,
+      model_dir=FLAGS.model_dir,
+      session_config=tf.ConfigProto(
+          allow_soft_placement=True, log_device_placement=True),
+      tpu_config=tf.contrib.tpu.TPUConfig(FLAGS.iterations, FLAGS.num_shards),
+  )
+
+  estimator = tf.contrib.tpu.TPUEstimator(
+      model_fn=loaded_train_model,
+      use_tpu=FLAGS.use_tpu,
+      train_batch_size=FLAGS.batch_size,
+      eval_batch_size=FLAGS.batch_size,
+      params={"data_dir": FLAGS.data_dir},
+      config=run_config)
+
+  # TPUEstimator.train *requires* a max_steps argument.
+  estimator.train(input_fn=train_input_fn, max_steps=FLAGS.train_steps)
+  
+  return {}, FLAGS.train_steps
+
   while global_step < num_train_steps:
     ### Run a step ###
     start_time = time.time()
